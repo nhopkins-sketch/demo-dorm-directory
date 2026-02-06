@@ -7,10 +7,10 @@
   <!-- Tailwind Play CDN for quick prototyping -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* Invert entire page colors */
-    html {
+    /* Invert entire page colors on body for broader browser support */
+    body {
       filter: invert(1) hue-rotate(180deg);
-      background: #000;
+      background-color: #000 !important;
     }
     /* Revert images, video and iframes so media remain natural */
     img, video, iframe {
@@ -19,6 +19,8 @@
     /* Revert form controls so inputs/selects look correct */
     input, select, textarea, button {
       filter: invert(1) hue-rotate(180deg);
+      background-color: transparent !important;
+      color: inherit !important;
     }
   </style>
 </head>
