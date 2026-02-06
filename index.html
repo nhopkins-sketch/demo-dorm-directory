@@ -6,6 +6,21 @@
   <title>Dorm Directory Demo</title>
   <!-- Tailwind Play CDN for quick prototyping -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Invert entire page colors */
+    html {
+      filter: invert(1) hue-rotate(180deg);
+      background: #000;
+    }
+    /* Revert images, video and iframes so media remain natural */
+    img, video, iframe {
+      filter: invert(1) hue-rotate(180deg);
+    }
+    /* Revert form controls so inputs/selects look correct */
+    input, select, textarea, button {
+      filter: invert(1) hue-rotate(180deg);
+    }
+  </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
   <div class="max-w-6xl mx-auto p-6">
