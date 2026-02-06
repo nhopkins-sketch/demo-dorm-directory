@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dorm Directory Demo</title>
+  <!-- Tailwind Play CDN for quick prototyping -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div class="max-w-6xl mx-auto p-6">
+    <header class="mb-6">
+      <h1 class="text-3xl font-bold">Dorm Directory</h1>
+      <p class="text-sm text-gray-600">Sample dorms from example-data.json — simple grid with filters.</p>
+    </header>
+
+    <section class="mb-6 bg-white p-4 rounded shadow-sm">
+      <h2 class="font-semibold mb-2">Filters</h2>
+      <div class="space-y-3">
+        <div class="flex gap-3 items-center">
+          <input id="search" type="search" placeholder="Quick search name..." class="p-2 border rounded flex-1" />
+          <label class="flex items-center gap-2 text-sm">
+            <span class="text-gray-600">Mode</span>
+            <select id="mode" class="p-2 border rounded">
+              <option value="and">AND</option>
+              <option value="or">OR</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="propertyFilters" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+      </div>
+    </section>
+
+    <section>
+      <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+    </section>
+
+    <footer class="mt-8 text-sm text-gray-500">Data source: <a href="example-data.json" class="underline">example-data.json</a></footer>
+  </div>
+
+  <script>
+    // Using the deployed Apps Script web app URL (hardcoded)
+    const DATA_URL = 'https://script.google.com/macros/s/AKfycbwhGOPVeVcPGkq4raB8HBsBejAlWGm7jSsnWfA-uu4V9J8FnD2rC25cke-vqdhLcrCW/exec';
+    let dorms = [];
+
+    function parseCapacity(val) {
+      if (val == null) return null;
+      if (typeof val === 'number') return val;
+      const num = parseInt(String(val).replace(/[^0-9]/g, ''), 10);
+      return Number.isFinite(num) ? num : null;
+    }
+
+    function unique(arr) {
+      return Array.from(new Set(arr)).filter(Boolean).sort();
+    }
+
+    // Properties to create filters for (order matters)
+    const PROPERTIES = ['Name','Sex','Quad','Capacity','Colors','Chapel','Mascot','Notes'];
+
+    function createPropertyFilterRow(prop, values) {
+      const row = document.createElement('div');
+      row.className = 'flex gap-2 items-center';
+
+      const label = document.createElement('div');
+      label.className = 'w-28 text-sm text-gray-700';
+      label.textContent = prop;
+
+      const opSelect = document.createElement('select');
+      opSelect.className = 'p-2 border rounded w-36 text-sm';
+
+      const inputWrap = document.createElement('div');
+      inputWrap.className = 'flex-1';
+
+      // Numeric property (Capacity) gets numeric operators
+      if (prop === 'Capacity') {
+        ['=', '>=', '<=', '>', '<'].forEach(o => {
+          const opt = document.createElement('option'); opt.value = o; opt.textContent = o; opSelect.appendChild(opt);
+        });
+        const input = document.createElement('input');
+        input.type = 'number'; input.className = 'p-2 border rounded w-full';
+        inputWrap.appendChild(input);
+      } else if (values && values.length > 0 && (prop === 'Sex' || prop === 'Quad')) {
+        // For Sex and Quad use equals with a select of unique values
+        const opt = document.createElement('option'); opt.value = 'equals'; opt.textContent = 'equals'; opSelect.appendChild(opt);
+        const select = document.createElement('select'); select.className = 'p-2 border rounded w-full';
+        const empty = document.createElement('option'); empty.value = ''; empty.textContent = 'Any'; select.appendChild(empty);
+        values.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; select.appendChild(o); });
+        inputWrap.appendChild(select);
+      } else {
+        // Text operators
+        ['contains','equals','startsWith','endsWith'].forEach(o => {
+          const opt = document.createElement('option'); opt.value = o; opt.textContent = o; opSelect.appendChild(opt);
+        });
+        const input = document.createElement('input');
+        input.type = 'text'; input.className = 'p-2 border rounded w-full';
+        inputWrap.appendChild(input);
+      }
+
+      row.appendChild(label);
+      row.appendChild(opSelect);
+      row.appendChild(inputWrap);
+
+      // attach dataset to row for easy access
+      row.dataset.prop = prop;
+      return row;
+    }
+
+    function buildFilters(data) {
+      const sexes = unique(data.map(d => d.Sex));
+      const quads = unique(data.map(d => d.Quad));
+
+      const container = document.getElementById('propertyFilters');
+      container.innerHTML = '';
+
+      PROPERTIES.forEach(prop => {
+        const values = (prop === 'Sex') ? sexes : (prop === 'Quad' ? quads : null);
+        const row = createPropertyFilterRow(prop, values);
+        container.appendChild(row);
+      });
+
+      // attach event listeners for all controls
+      container.querySelectorAll('select, input').forEach(el => el.addEventListener('input', applyFilters));
+    }
+
+    function createCard(dorm) {
+      const cap = parseCapacity(dorm.Capacity);
+      const card = document.createElement('div');
+      card.className = 'bg-white p-4 rounded shadow hover:shadow-md transition';
+      card.innerHTML = `
+        <h3 class="font-semibold text-lg">${dorm.Name || ''}</h3>
+        <div class="text-sm text-gray-600 mt-1">${dorm.Quad || ''} • ${dorm.Sex || ''}</div>
+        <div class="mt-2 text-sm">
+          <div><strong>Capacity:</strong> ${dorm.Capacity || '—'}</div>
+          <div><strong>Mascot:</strong> ${dorm.Mascot || '—'}</div>
+          <div><strong>Colors:</strong> ${dorm.Colors || '—'}</div>
+        </div>
+        <div class="mt-3 text-xs text-gray-500">${dorm.Notes || ''}</div>
+      `;
+      return card;
+    }
+
+    function render(filtered) {
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      if (!filtered || filtered.length === 0) {
+        grid.innerHTML = '<div class="text-gray-600">No dorms match the filters.</div>';
+        return;
+      }
+      filtered.forEach(d => grid.appendChild(createCard(d)));
+    }
+
+    function applyFilters() {
+      const mode = document.getElementById('mode').value; // 'and' or 'or'
+      const q = document.getElementById('search').value.trim().toLowerCase();
+
+      // Gather active property filters
+      const rows = Array.from(document.getElementById('propertyFilters').children);
+      const filters = rows.map(row => {
+        const prop = row.dataset.prop;
+        const op = row.querySelector('select').value;
+        const inputEl = row.querySelector('input, select:nth-of-type(2)');
+        const val = inputEl ? inputEl.value : '';
+        return { prop, op, val };
+      }).filter(f => f.val !== '' && f.val != null);
+
+      function testDorm(d) {
+        const checks = [];
+
+        // quick search by name if provided
+        if (q) checks.push((d.Name || '').toLowerCase().includes(q));
+
+        filters.forEach(f => {
+          const propVal = d[f.prop];
+          if (f.prop === 'Capacity') {
+            const left = parseCapacity(propVal);
+            const right = parseFloat(f.val);
+            if (!Number.isFinite(right) || left == null) {
+              checks.push(false);
+              return;
+            }
+            switch (f.op) {
+              case '=': checks.push(left === right); break;
+              case '>=': checks.push(left >= right); break;
+              case '<=': checks.push(left <= right); break;
+              case '>': checks.push(left > right); break;
+              case '<': checks.push(left < right); break;
+              default: checks.push(false);
+            }
+          } else {
+            const target = (propVal || '').toString();
+            const needle = f.val.toString();
+            switch (f.op) {
+              case 'contains': checks.push(target.toLowerCase().includes(needle.toLowerCase())); break;
+              case 'equals': checks.push(target.toLowerCase() === needle.toLowerCase()); break;
+              case 'startsWith': checks.push(target.toLowerCase().startsWith(needle.toLowerCase())); break;
+              case 'endsWith': checks.push(target.toLowerCase().endsWith(needle.toLowerCase())); break;
+              default: checks.push(false);
+            }
+          }
+        });
+
+        if (checks.length === 0) return true; // no active filters -> include
+        if (mode === 'and') return checks.every(Boolean);
+        return checks.some(Boolean);
+      }
+
+      const filtered = dorms.filter(testDorm);
+      render(filtered);
+    }
+
+    async function init() {
+      try {
+        const res = await fetch(DATA_URL);
+        const json = await res.json();
+        dorms = json.dorms || [];
+        buildFilters(dorms);
+        render(dorms);
+
+        document.getElementById('search').addEventListener('input', applyFilters);
+        document.getElementById('sexFilter').addEventListener('change', applyFilters);
+        document.getElementById('quadFilter').addEventListener('change', applyFilters);
+        document.getElementById('minCapacity').addEventListener('input', applyFilters);
+      } catch (err) {
+        document.getElementById('grid').innerHTML = '<div class="text-red-500">Error loading data.</div>';
+        console.error(err);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
